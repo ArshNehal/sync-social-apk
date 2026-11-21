@@ -1,0 +1,6 @@
+{
+  "name": "SYNC",
+  "description": "A premium full-stack social networking platform combining Instagram's visual richness, Threads' conversational intimacy, and Apple's Liquid Glass aesthetic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

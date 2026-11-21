@@ -1,0 +1,1178 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ========================================================
+    // Global Hardened Primitives
+    // ========================================================
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 256 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidShortId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUsername(u) {
+      return u is string && u.size() >= 3 && u.size() <= 20 && u.matches('^[a-z0-9_.]+$');
+    }
+
+    // ========================================================
+    // Validation Blueprints (Anti-Update-Gap)
+    // ========================================================
+    function isValidPublicUser(data, userId) {
+      return data.keys().hasAll([
+        'id', 'username', 'username_lower', 'display_name',
+        'bio', 'avatar_url', 'is_verified', 'is_private',
+        'created_at', 'updated_at'
+      ])
+      && data.keys().hasOnly([
+        'id', 'username', 'username_lower', 'display_name',
+        'bio', 'avatar_url', 'banner_url', 'website', 'location',
+        'is_verified', 'is_private', 'created_at', 'updated_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == userId
+      && isValidUsername(data.username)
+      && isValidUsername(data.username_lower)
+      && data.username_lower == data.username
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.bio is string && data.bio.size() <= 500
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && (!('banner_url' in data) || (data.banner_url is string && data.banner_url.size() <= 450000))
+      && (!('website' in data) || (data.website is string && data.website.size() <= 200))
+      && (!('location' in data) || (data.location is string && data.location.size() <= 100))
+      && data.is_verified is bool
+      && data.is_private is bool
+      && data.created_at is timestamp
+      && data.updated_at is timestamp;
+    }
+
+    function isValidPrivateUserInfo(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'created_at', 'updated_at'])
+      && data.keys().hasOnly([
+        'uid', 'email', 'has_password', 'password_hash', 'password_salt',
+        'created_at', 'updated_at'
+      ])
+      && isValidShortId(data.uid)
+      && data.uid == userId
+      && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+      && (!('has_password' in data) || data.has_password is bool)
+      && (!('password_hash' in data) || (data.password_hash is string && data.password_hash.size() <= 128))
+      && (!('password_salt' in data) || (data.password_salt is string && data.password_salt.size() <= 64))
+      && data.created_at is timestamp
+      && data.updated_at is timestamp;
+    }
+
+    function isValidPost(data, postId) {
+      return data.keys().hasAll([
+        'id', 'user_id', 'username', 'display_name', 'avatar_url',
+        'is_verified', 'content', 'images', 'likes_count', 'comments_count',
+        'created_at', 'updated_at'
+      ])
+      && data.keys().hasOnly([
+        'id', 'user_id', 'username', 'display_name', 'avatar_url',
+        'is_verified', 'content', 'images', 'likes_count', 'comments_count',
+        'reposts_count', 'is_repost', 'repost_of_id', 'repost_of_user',
+        'repost_of_display_name', 'repost_of_content', 'repost_of_image',
+        'is_pinned', 'pinned_at', 'hide_likes', 'comments_disabled', 'mentions',
+        'created_at', 'updated_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == postId
+      && isValidShortId(data.user_id)
+      && isValidUsername(data.username)
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && data.is_verified is bool
+      && data.content is string && data.content.size() <= 2000
+      && data.images is list && data.images.size() <= 4
+      && (data.images.size() == 0 || (data.images[0] is string && data.images[0].size() <= 450000))
+      && (!('reposts_count' in data) || (data.reposts_count is int && data.reposts_count >= 0))
+      && (!('is_repost' in data) || data.is_repost is bool)
+      && (!('repost_of_id' in data) || data.repost_of_id == null || isValidShortId(data.repost_of_id))
+      && (!('repost_of_user' in data) || data.repost_of_user == null || (data.repost_of_user is string && data.repost_of_user.size() <= 20))
+      && (!('repost_of_display_name' in data) || data.repost_of_display_name == null || (data.repost_of_display_name is string && data.repost_of_display_name.size() <= 80))
+      && (!('repost_of_content' in data) || data.repost_of_content == null || (data.repost_of_content is string && data.repost_of_content.size() <= 1000))
+      && (!('repost_of_image' in data) || data.repost_of_image == null || (data.repost_of_image is string && data.repost_of_image.size() <= 450000))
+      && (!('is_pinned' in data) || data.is_pinned is bool)
+      && (!('pinned_at' in data) || data.pinned_at == null || data.pinned_at is timestamp)
+      && (!('hide_likes' in data) || data.hide_likes is bool)
+      && (!('comments_disabled' in data) || data.comments_disabled is bool)
+      && (!('mentions' in data) || (data.mentions is list && data.mentions.size() <= 10 && (data.mentions.size() == 0 || isValidUsername(data.mentions[0]))))
+      && (data.content.size() > 0 || data.images.size() > 0 || ('repost_of_id' in data && data.repost_of_id is string && data.repost_of_id.size() > 0))
+      && data.likes_count is int && data.likes_count >= 0
+      && data.comments_count is int && data.comments_count >= 0
+      && data.created_at is timestamp
+      && data.updated_at is timestamp;
+    }
+
+    function isValidLike(data, likeId) {
+      return data.keys().hasAll(['id', 'user_id', 'post_id', 'created_at'])
+      && data.keys().hasOnly(['id', 'user_id', 'post_id', 'created_at'])
+      && isValidId(data.id)
+      && data.id == likeId
+      && isValidShortId(data.user_id)
+      && isValidShortId(data.post_id)
+      && data.created_at is timestamp;
+    }
+
+    function isValidComment(data, commentId) {
+      return data.keys().hasAll([
+        'id', 'post_id', 'user_id', 'content', 'likes_count',
+        'username', 'display_name', 'avatar_url', 'is_verified', 'created_at'
+      ])
+      && data.keys().hasOnly([
+        'id', 'post_id', 'user_id', 'parent_id', 'content', 'likes_count',
+        'username', 'display_name', 'avatar_url', 'is_verified', 'created_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == commentId
+      && isValidShortId(data.post_id)
+      && isValidShortId(data.user_id)
+      && (!('parent_id' in data) || data.parent_id == null || isValidShortId(data.parent_id))
+      && data.content is string && data.content.size() >= 1 && data.content.size() <= 1000
+      && data.likes_count is int && data.likes_count >= 0
+      && isValidUsername(data.username)
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && data.is_verified is bool
+      && data.created_at is timestamp;
+    }
+
+    function isValidBookmark(data, bookmarkId) {
+      return data.keys().hasAll(['id', 'user_id', 'post_id', 'created_at'])
+      && data.keys().hasOnly(['id', 'user_id', 'post_id', 'created_at'])
+      && isValidId(data.id)
+      && data.id == bookmarkId
+      && isValidShortId(data.user_id)
+      && isValidShortId(data.post_id)
+      && data.created_at is timestamp;
+    }
+
+    function isValidStory(data, storyId) {
+      return data.keys().hasAll([
+        'id', 'user_id', 'username', 'display_name', 'avatar_url',
+        'is_verified', 'image_url', 'caption', 'expires_at', 'created_at'
+      ])
+      && data.keys().hasOnly([
+        'id', 'user_id', 'username', 'display_name', 'avatar_url',
+        'is_verified', 'image_url', 'caption', 'tags', 'expires_at', 'created_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == storyId
+      && isValidShortId(data.user_id)
+      && isValidUsername(data.username)
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && data.is_verified is bool
+      && data.image_url is string && data.image_url.size() >= 1 && data.image_url.size() <= 450000
+      && data.caption is string && data.caption.size() <= 120
+      && (!('tags' in data) || (data.tags is list && data.tags.size() <= 10 && (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() >= 1 && data.tags[0].size() <= 40))))
+      && data.expires_at is timestamp
+      && data.created_at is timestamp;
+    }
+
+    function isValidStoryView(data, storyId, viewerId) {
+      return data.keys().hasAll(['story_id', 'user_id', 'created_at'])
+      && data.keys().hasOnly(['story_id', 'user_id', 'created_at'])
+      && isValidShortId(data.story_id)
+      && data.story_id == storyId
+      && isValidShortId(data.user_id)
+      && data.user_id == viewerId
+      && data.created_at is timestamp;
+    }
+
+    function isValidFollow(data, followId) {
+      return data.keys().hasAll(['id', 'follower_id', 'following_id', 'created_at'])
+      && data.keys().hasOnly(['id', 'follower_id', 'following_id', 'created_at'])
+      && isValidId(data.id)
+      && data.id == followId
+      && isValidShortId(data.follower_id)
+      && isValidShortId(data.following_id)
+      && data.follower_id != data.following_id
+      && data.created_at is timestamp;
+    }
+
+    function isValidFollowRequest(data, requestId) {
+      return data.keys().hasAll(['id', 'requester_id', 'target_id', 'status', 'created_at'])
+      && data.keys().hasOnly(['id', 'requester_id', 'target_id', 'status', 'created_at'])
+      && isValidId(data.id)
+      && data.id == requestId
+      && isValidShortId(data.requester_id)
+      && isValidShortId(data.target_id)
+      && data.requester_id != data.target_id
+      && data.status == 'pending'
+      && data.created_at is timestamp;
+    }
+
+    function isValidBlock(data, blockId) {
+      return data.keys().hasAll(['id', 'blocker_id', 'blocked_id', 'created_at'])
+      && data.keys().hasOnly(['id', 'blocker_id', 'blocked_id', 'created_at'])
+      && isValidId(data.id)
+      && data.id == blockId
+      && isValidShortId(data.blocker_id)
+      && isValidShortId(data.blocked_id)
+      && data.blocker_id != data.blocked_id
+      && data.created_at is timestamp;
+    }
+
+    function isValidConversation(data, convId) {
+      return data.keys().hasAll(['id', 'member_ids', 'created_at', 'updated_at'])
+      && data.keys().hasOnly([
+        'id', 'member_ids', 'last_message_content', 'last_message_sender',
+        'last_message_time', 'created_at', 'updated_at'
+      ])
+      && isValidId(data.id)
+      && data.id == convId
+      && data.member_ids is list && data.member_ids.size() == 2
+      && isValidShortId(data.member_ids[0]) && isValidShortId(data.member_ids[1])
+      && data.member_ids[0] != data.member_ids[1]
+      && (!('last_message_content' in data) || (data.last_message_content is string && data.last_message_content.size() <= 1000))
+      && (!('last_message_sender' in data) || (data.last_message_sender is string && data.last_message_sender.size() <= 128))
+      && (!('last_message_time' in data) || data.last_message_time is timestamp)
+      && data.created_at is timestamp
+      && data.updated_at is timestamp;
+    }
+
+    function isValidMessage(data, convId, messageId) {
+      return data.keys().hasAll(['id', 'conversation_id', 'sender_id', 'member_ids', 'content', 'created_at'])
+      && data.keys().hasOnly([
+        'id', 'conversation_id', 'sender_id', 'member_ids', 'content', 'image_url',
+        'reply_to_id', 'reply_to_text', 'reply_to_sender',
+        'shared_post_id', 'shared_post_author', 'shared_post_username', 'shared_post_text', 'shared_post_image',
+        'created_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == messageId
+      && isValidId(data.conversation_id)
+      && data.conversation_id == convId
+      && isValidShortId(data.sender_id)
+      && data.member_ids is list && data.member_ids.size() == 2
+      && isValidShortId(data.member_ids[0]) && isValidShortId(data.member_ids[1])
+      && data.content is string && data.content.size() <= 2000
+      && (!('image_url' in data) || data.image_url == null || (data.image_url is string && data.image_url.size() <= 450000))
+      && (!('reply_to_id' in data) || data.reply_to_id == null || isValidShortId(data.reply_to_id))
+      && (!('reply_to_text' in data) || data.reply_to_text == null || (data.reply_to_text is string && data.reply_to_text.size() <= 300))
+      && (!('reply_to_sender' in data) || data.reply_to_sender == null || (data.reply_to_sender is string && data.reply_to_sender.size() <= 80))
+      && (!('shared_post_id' in data) || data.shared_post_id == null || isValidShortId(data.shared_post_id))
+      && (!('shared_post_author' in data) || data.shared_post_author == null || (data.shared_post_author is string && data.shared_post_author.size() <= 80))
+      && (!('shared_post_username' in data) || data.shared_post_username == null || (data.shared_post_username is string && data.shared_post_username.size() <= 20))
+      && (!('shared_post_text' in data) || data.shared_post_text == null || (data.shared_post_text is string && data.shared_post_text.size() <= 300))
+      && (!('shared_post_image' in data) || data.shared_post_image == null || (data.shared_post_image is string && data.shared_post_image.size() <= 450000))
+      && (
+        data.content.size() > 0
+        || ('image_url' in data && data.image_url is string && data.image_url.size() > 0)
+        || ('shared_post_id' in data && data.shared_post_id is string && data.shared_post_id.size() > 0)
+      )
+      && data.created_at is timestamp;
+    }
+
+    function isValidConvRead(data, readerId) {
+      return data.keys().hasAll(['user_id', 'last_read_at'])
+      && data.keys().hasOnly(['user_id', 'last_read_at'])
+      && isValidShortId(data.user_id)
+      && data.user_id == readerId
+      && data.last_read_at is timestamp;
+    }
+
+    function isValidNotification(data, notifId) {
+      return data.keys().hasAll([
+        'id', 'user_id', 'actor_id', 'actor_username', 'actor_display_name',
+        'actor_avatar_url', 'actor_verified', 'type', 'target_id', 'read', 'created_at'
+      ])
+      && data.keys().hasOnly([
+        'id', 'user_id', 'actor_id', 'actor_username', 'actor_display_name',
+        'actor_avatar_url', 'actor_verified', 'type', 'target_id', 'read', 'created_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == notifId
+      && isValidShortId(data.user_id)
+      && isValidShortId(data.actor_id)
+      && isValidUsername(data.actor_username)
+      && data.actor_display_name is string && data.actor_display_name.size() >= 1 && data.actor_display_name.size() <= 80
+      && data.actor_avatar_url is string && data.actor_avatar_url.size() <= 350000
+      && data.actor_verified is bool
+      && data.type in ['like', 'comment', 'reply', 'follow', 'follow_request', 'message', 'welcome', 'repost', 'quote', 'story_tag', 'mention']
+      && data.target_id is string && data.target_id.size() <= 256
+      && data.read is bool
+      && data.created_at is timestamp;
+    }
+
+    function isValidReport(data, reportId) {
+      return data.keys().hasAll(['id', 'reporter_id', 'target_type', 'target_id', 'reason', 'details', 'status', 'created_at'])
+      && data.keys().hasOnly(['id', 'reporter_id', 'target_type', 'target_id', 'reason', 'details', 'status', 'created_at'])
+      && isValidShortId(data.id)
+      && data.id == reportId
+      && isValidShortId(data.reporter_id)
+      && data.target_type in ['post', 'user', 'comment']
+      && data.target_id is string && data.target_id.size() >= 1 && data.target_id.size() <= 256
+      && data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 200
+      && data.details is string && data.details.size() <= 1000
+      && data.status == 'pending'
+      && data.created_at is timestamp;
+    }
+
+    function isValidPresence(data, userId) {
+      return data.keys().hasAll(['user_id', 'online', 'last_seen_at'])
+      && data.keys().hasOnly(['user_id', 'online', 'last_seen_at'])
+      && isValidShortId(data.user_id)
+      && data.user_id == userId
+      && data.online is bool
+      && data.last_seen_at is timestamp;
+    }
+
+    function isValidSyncPoints(data, userId) {
+      return data.keys().hasAll([
+        'user_id', 'username', 'display_name', 'avatar_url', 'is_verified',
+        'points', 'daily_unlocked_day', 'streak_days', 'interactions_count', 'updated_at'
+      ])
+      && data.keys().hasOnly([
+        'user_id', 'username', 'display_name', 'avatar_url', 'is_verified',
+        'points', 'daily_unlocked_day', 'streak_days', 'interactions_count', 'updated_at'
+      ])
+      && isValidShortId(data.user_id)
+      && data.user_id == userId
+      && isValidUsername(data.username)
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && data.is_verified is bool
+      && data.points is int && data.points >= 0
+      && data.daily_unlocked_day is string && data.daily_unlocked_day.size() <= 16
+      && data.streak_days is int && data.streak_days >= 0 && data.streak_days <= 10000
+      && data.interactions_count is int && data.interactions_count >= 0
+      && data.updated_at is timestamp;
+    }
+
+    function isValidNote(data, userId) {
+      return data.keys().hasAll([
+        'user_id', 'username', 'display_name', 'avatar_url', 'is_verified',
+        'text', 'expires_at', 'created_at', 'updated_at'
+      ])
+      && data.keys().hasOnly([
+        'user_id', 'username', 'display_name', 'avatar_url', 'is_verified',
+        'text', 'expires_at', 'created_at', 'updated_at'
+      ])
+      && isValidShortId(data.user_id)
+      && data.user_id == userId
+      && isValidUsername(data.username)
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && data.is_verified is bool
+      && data.text is string && data.text.size() >= 1 && data.text.size() <= 60
+      && data.expires_at is timestamp
+      && data.created_at is timestamp
+      && data.updated_at is timestamp;
+    }
+
+    function isValidCloseFriend(data, userId, friendId) {
+      return data.keys().hasAll(['user_id', 'friend_id', 'created_at'])
+      && data.keys().hasOnly(['user_id', 'friend_id', 'created_at'])
+      && isValidShortId(data.user_id)
+      && data.user_id == userId
+      && isValidShortId(data.friend_id)
+      && data.friend_id == friendId
+      && data.user_id != data.friend_id
+      && data.created_at is timestamp;
+    }
+
+    function isValidCloseFriendsStory(data, storyId) {
+      return data.keys().hasAll([
+        'id', 'user_id', 'username', 'display_name', 'avatar_url',
+        'is_verified', 'image_url', 'caption', 'viewer_ids', 'expires_at', 'created_at'
+      ])
+      && data.keys().hasOnly([
+        'id', 'user_id', 'username', 'display_name', 'avatar_url',
+        'is_verified', 'image_url', 'caption', 'tags', 'viewer_ids', 'expires_at', 'created_at'
+      ])
+      && isValidShortId(data.id)
+      && data.id == storyId
+      && isValidShortId(data.user_id)
+      && isValidUsername(data.username)
+      && data.display_name is string && data.display_name.size() >= 1 && data.display_name.size() <= 80
+      && data.avatar_url is string && data.avatar_url.size() <= 350000
+      && data.is_verified is bool
+      && data.image_url is string && data.image_url.size() >= 1 && data.image_url.size() <= 450000
+      && data.caption is string && data.caption.size() <= 120
+      && (!('tags' in data) || (data.tags is list && data.tags.size() <= 10 && (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() >= 1 && data.tags[0].size() <= 40))))
+      && data.viewer_ids is list && data.viewer_ids.size() >= 1 && data.viewer_ids.size() <= 100
+      && isValidShortId(data.viewer_ids[0])
+      && data.expires_at is timestamp
+      && data.created_at is timestamp;
+    }
+
+    function isValidStoryHighlight(data, highlightId) {
+      return data.keys().hasAll(['id', 'user_id', 'title', 'cover_url', 'created_at', 'updated_at'])
+      && data.keys().hasOnly(['id', 'user_id', 'title', 'cover_url', 'created_at', 'updated_at'])
+      && isValidShortId(data.id)
+      && data.id == highlightId
+      && isValidShortId(data.user_id)
+      && data.title is string && data.title.size() >= 1 && data.title.size() <= 32
+      && data.cover_url is string && data.cover_url.size() >= 1 && data.cover_url.size() <= 450000
+      && data.created_at is timestamp
+      && data.updated_at is timestamp;
+    }
+
+    function isValidStoryHighlightItem(data, highlightId, itemId) {
+      return data.keys().hasAll(['id', 'highlight_id', 'user_id', 'image_url', 'caption', 'created_at'])
+      && data.keys().hasOnly(['id', 'highlight_id', 'user_id', 'image_url', 'caption', 'tags', 'created_at'])
+      && isValidShortId(data.id)
+      && data.id == itemId
+      && isValidShortId(data.highlight_id)
+      && data.highlight_id == highlightId
+      && isValidShortId(data.user_id)
+      && data.image_url is string && data.image_url.size() >= 1 && data.image_url.size() <= 450000
+      && data.caption is string && data.caption.size() <= 120
+      && (!('tags' in data) || (data.tags is list && data.tags.size() <= 10))
+      && data.created_at is timestamp;
+    }
+
+    function isValidCommentLike(data, likeId) {
+      return data.keys().hasAll(['id', 'user_id', 'comment_id', 'created_at'])
+      && data.keys().hasOnly(['id', 'user_id', 'comment_id', 'created_at'])
+      && isValidId(data.id)
+      && data.id == likeId
+      && isValidShortId(data.user_id)
+      && isValidShortId(data.comment_id)
+      && data.created_at is timestamp;
+    }
+
+    function isValidMessageReaction(data, reactionId) {
+      return data.keys().hasAll(['id', 'message_id', 'user_id', 'member_ids', 'emoji', 'updated_at'])
+      && data.keys().hasOnly(['id', 'message_id', 'user_id', 'member_ids', 'emoji', 'updated_at'])
+      && isValidId(data.id)
+      && data.id == reactionId
+      && isValidShortId(data.message_id)
+      && isValidShortId(data.user_id)
+      && data.member_ids is list && data.member_ids.size() == 2
+      && isValidShortId(data.member_ids[0]) && isValidShortId(data.member_ids[1])
+      && data.emoji is string && data.emoji.size() >= 1 && data.emoji.size() <= 16
+      && data.updated_at is timestamp;
+    }
+
+    function isValidConvTyping(data, userId) {
+      return data.keys().hasAll(['user_id', 'is_typing', 'updated_at'])
+      && data.keys().hasOnly(['user_id', 'is_typing', 'updated_at'])
+      && isValidShortId(data.user_id)
+      && data.user_id == userId
+      && data.is_typing is bool
+      && data.updated_at is timestamp;
+    }
+
+    // ========================================================
+    // Collections
+    // ========================================================
+
+    match /users/{userId} {
+      allow get: if isValidShortId(userId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidPublicUser(incoming(), userId)
+        && incoming().is_verified == false
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidPublicUser(incoming(), userId)
+        && incoming().id == existing().id
+        && incoming().is_verified == existing().is_verified
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'username_lower', 'display_name', 'bio',
+          'avatar_url', 'banner_url', 'website', 'location',
+          'is_private', 'updated_at'
+        ]);
+      allow delete: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId);
+
+      // Private Close Friends List (owner lists all; friend can only verify own friendship edge)
+      match /close_friends/{friendId} {
+        allow get: if isSignedIn()
+          && isValidShortId(userId)
+          && isValidShortId(friendId)
+          && (isOwner(userId) || isOwner(friendId));
+        allow list: if isSignedIn() && resource.data.user_id == request.auth.uid;
+        allow create: if isVerifiedEmail()
+          && isOwner(userId)
+          && isValidShortId(userId)
+          && isValidShortId(friendId)
+          && userId != friendId
+          && isValidCloseFriend(incoming(), userId, friendId)
+          && incoming().created_at == request.time;
+        allow update: if false;
+        allow delete: if isVerifiedEmail()
+          && isOwner(userId)
+          && isValidShortId(userId)
+          && isValidShortId(friendId);
+      }
+
+      // Pillar 6: Isolated Private PII
+      match /private/info {
+        allow get: if isOwner(userId);
+        allow list: if false;
+        allow create: if isVerifiedEmail()
+          && isOwner(userId)
+          && isValidPrivateUserInfo(incoming(), userId)
+          && incoming().created_at == request.time
+          && incoming().updated_at == request.time;
+        allow update: if isVerifiedEmail()
+          && isOwner(userId)
+          && isValidPrivateUserInfo(incoming(), userId)
+          && incoming().uid == existing().uid
+          && incoming().created_at == existing().created_at
+          && incoming().updated_at == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'email', 'has_password', 'password_hash', 'password_salt', 'updated_at'
+          ]);
+        allow delete: if isVerifiedEmail()
+          && isOwner(userId)
+          && isValidShortId(userId);
+      }
+    }
+
+    match /posts/{postId} {
+      allow get: if isValidShortId(postId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(postId)
+        && isValidPost(incoming(), postId)
+        && incoming().user_id == request.auth.uid
+        && incoming().likes_count == 0
+        && incoming().comments_count == 0
+        && (!('reposts_count' in incoming()) || incoming().reposts_count == 0)
+        && incoming().is_verified == false
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isValidShortId(postId)
+        && isValidPost(incoming(), postId)
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().is_verified == existing().is_verified
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && (
+          // Action 1: Post owner edits content, mentions, pinning, engagement controls, or profile snapshot
+          (
+            existing().user_id == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'mentions', 'updated_at'])
+          )
+          ||
+          (
+            existing().user_id == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['is_pinned', 'pinned_at', 'hide_likes', 'comments_disabled', 'updated_at'])
+          )
+          ||
+          (
+            existing().user_id == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'display_name', 'avatar_url', 'updated_at'])
+          )
+          ||
+          // Action 2a: Atomic Like increment paired with /likes/{postId}__{uid}
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['likes_count', 'updated_at'])
+            && incoming().likes_count == existing().likes_count + 1
+            && !exists(/databases/$(database)/documents/likes/$(postId + '__' + request.auth.uid))
+            && existsAfter(/databases/$(database)/documents/likes/$(postId + '__' + request.auth.uid))
+          )
+          ||
+          // Action 2b: Atomic Like decrement paired with deleting /likes/{postId}__{uid}
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['likes_count', 'updated_at'])
+            && existing().likes_count > 0
+            && incoming().likes_count == existing().likes_count - 1
+            && exists(/databases/$(database)/documents/likes/$(postId + '__' + request.auth.uid))
+            && !existsAfter(/databases/$(database)/documents/likes/$(postId + '__' + request.auth.uid))
+          )
+          ||
+          // Action 3: Comment counter increment/decrement
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['comments_count', 'updated_at'])
+            && (
+              incoming().comments_count == existing().comments_count + 1
+              || (existing().comments_count > 0 && incoming().comments_count == existing().comments_count - 1)
+            )
+          )
+          ||
+          // Action 4: Repost / quote counter increment
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['reposts_count', 'updated_at'])
+            && (
+              (!('reposts_count' in existing()) && incoming().reposts_count == 1)
+              || ('reposts_count' in existing() && incoming().reposts_count == existing().reposts_count + 1)
+            )
+          )
+        );
+      allow delete: if isVerifiedEmail()
+        && isValidShortId(postId)
+        && existing().user_id == request.auth.uid;
+    }
+
+    match /likes/{likeId} {
+      allow get: if isValidId(likeId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidId(likeId)
+        && isValidLike(incoming(), likeId)
+        && incoming().user_id == request.auth.uid
+        && likeId == incoming().post_id + '__' + request.auth.uid
+        && incoming().created_at == request.time
+        && exists(/databases/$(database)/documents/posts/$(incoming().post_id))
+        && getAfter(/databases/$(database)/documents/posts/$(incoming().post_id)).data.likes_count
+           == get(/databases/$(database)/documents/posts/$(incoming().post_id)).data.likes_count + 1;
+      allow update: if false;
+      allow delete: if isVerifiedEmail()
+        && isValidId(likeId)
+        && existing().user_id == request.auth.uid
+        && (
+          !exists(/databases/$(database)/documents/posts/$(existing().post_id))
+          || get(/databases/$(database)/documents/posts/$(existing().post_id)).data.likes_count == 0
+          || getAfter(/databases/$(database)/documents/posts/$(existing().post_id)).data.likes_count
+             == get(/databases/$(database)/documents/posts/$(existing().post_id)).data.likes_count - 1
+        );
+    }
+
+    match /comments/{commentId} {
+      allow get: if isValidShortId(commentId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(commentId)
+        && isValidComment(incoming(), commentId)
+        && incoming().user_id == request.auth.uid
+        && incoming().likes_count == 0
+        && incoming().is_verified == false
+        && incoming().created_at == request.time
+        && exists(/databases/$(database)/documents/posts/$(incoming().post_id))
+        && getAfter(/databases/$(database)/documents/posts/$(incoming().post_id)).data.comments_count
+           == get(/databases/$(database)/documents/posts/$(incoming().post_id)).data.comments_count + 1;
+      allow update: if isVerifiedEmail()
+        && isValidShortId(commentId)
+        && isValidComment(incoming(), commentId)
+        && incoming().id == existing().id
+        && incoming().post_id == existing().post_id
+        && incoming().user_id == existing().user_id
+        && incoming().content == existing().content
+        && incoming().is_verified == existing().is_verified
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['likes_count'])
+        && (
+          (
+            incoming().likes_count == existing().likes_count + 1
+            && !exists(/databases/$(database)/documents/comment_likes/$(commentId + '__' + request.auth.uid))
+            && existsAfter(/databases/$(database)/documents/comment_likes/$(commentId + '__' + request.auth.uid))
+          )
+          ||
+          (
+            existing().likes_count > 0
+            && incoming().likes_count == existing().likes_count - 1
+            && exists(/databases/$(database)/documents/comment_likes/$(commentId + '__' + request.auth.uid))
+            && !existsAfter(/databases/$(database)/documents/comment_likes/$(commentId + '__' + request.auth.uid))
+          )
+        );
+      allow delete: if isVerifiedEmail()
+        && isValidShortId(commentId)
+        && existing().user_id == request.auth.uid
+        && (
+          !exists(/databases/$(database)/documents/posts/$(existing().post_id))
+          || get(/databases/$(database)/documents/posts/$(existing().post_id)).data.comments_count == 0
+          || getAfter(/databases/$(database)/documents/posts/$(existing().post_id)).data.comments_count
+             == get(/databases/$(database)/documents/posts/$(existing().post_id)).data.comments_count - 1
+        );
+    }
+
+    match /comment_likes/{likeId} {
+      allow get: if isValidId(likeId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidId(likeId)
+        && isValidCommentLike(incoming(), likeId)
+        && incoming().user_id == request.auth.uid
+        && likeId == incoming().comment_id + '__' + request.auth.uid
+        && incoming().created_at == request.time
+        && exists(/databases/$(database)/documents/comments/$(incoming().comment_id))
+        && getAfter(/databases/$(database)/documents/comments/$(incoming().comment_id)).data.likes_count
+           == get(/databases/$(database)/documents/comments/$(incoming().comment_id)).data.likes_count + 1;
+      allow update: if false;
+      allow delete: if isVerifiedEmail()
+        && isValidId(likeId)
+        && existing().user_id == request.auth.uid
+        && (
+          !exists(/databases/$(database)/documents/comments/$(existing().comment_id))
+          || get(/databases/$(database)/documents/comments/$(existing().comment_id)).data.likes_count == 0
+          || getAfter(/databases/$(database)/documents/comments/$(existing().comment_id)).data.likes_count
+             == get(/databases/$(database)/documents/comments/$(existing().comment_id)).data.likes_count - 1
+        );
+    }
+
+    match /bookmarks/{bookmarkId} {
+      allow get: if isSignedIn() && isValidId(bookmarkId) && existing().user_id == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isVerifiedEmail()
+        && isValidId(bookmarkId)
+        && isValidBookmark(incoming(), bookmarkId)
+        && incoming().user_id == request.auth.uid
+        && bookmarkId == incoming().post_id + '__' + request.auth.uid
+        && incoming().created_at == request.time
+        && exists(/databases/$(database)/documents/posts/$(incoming().post_id));
+      allow update: if false;
+      allow delete: if isVerifiedEmail()
+        && isValidId(bookmarkId)
+        && existing().user_id == request.auth.uid;
+    }
+
+    match /stories/{storyId} {
+      allow get: if isValidShortId(storyId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(storyId)
+        && isValidStory(incoming(), storyId)
+        && incoming().user_id == request.auth.uid
+        && incoming().is_verified == false
+        && incoming().created_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isValidShortId(storyId)
+        && isValidStory(incoming(), storyId)
+        && existing().user_id == request.auth.uid
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().is_verified == existing().is_verified
+        && incoming().image_url == existing().image_url
+        && incoming().caption == existing().caption
+        && incoming().expires_at == existing().expires_at
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'display_name', 'avatar_url']);
+      allow delete: if isVerifiedEmail()
+        && isValidShortId(storyId)
+        && existing().user_id == request.auth.uid;
+
+      match /views/{viewerId} {
+        allow get: if isSignedIn() && isValidShortId(viewerId) && isOwner(viewerId);
+        allow list: if isSignedIn()
+          && (
+            resource.data.user_id == request.auth.uid
+            || get(/databases/$(database)/documents/stories/$(storyId)).data.user_id == request.auth.uid
+          );
+        allow create: if isVerifiedEmail()
+          && isValidShortId(storyId)
+          && isValidShortId(viewerId)
+          && isOwner(viewerId)
+          && isValidStoryView(incoming(), storyId, viewerId)
+          && incoming().created_at == request.time
+          && exists(/databases/$(database)/documents/stories/$(storyId));
+        allow update, delete: if false;
+      }
+    }
+
+    match /follows/{followId} {
+      allow get: if isValidId(followId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidId(followId)
+        && isValidFollow(incoming(), followId)
+        && followId == incoming().follower_id + '__' + incoming().following_id
+        && incoming().created_at == request.time
+        && (
+          incoming().follower_id == request.auth.uid
+          || (
+            incoming().following_id == request.auth.uid
+            && exists(/databases/$(database)/documents/follow_requests/$(incoming().follower_id + '__' + request.auth.uid))
+          )
+        );
+      allow update: if false;
+      allow delete: if isVerifiedEmail()
+        && isValidId(followId)
+        && (existing().follower_id == request.auth.uid || existing().following_id == request.auth.uid);
+    }
+
+    match /follow_requests/{requestId} {
+      allow get: if isSignedIn()
+        && isValidId(requestId)
+        && (existing().requester_id == request.auth.uid || existing().target_id == request.auth.uid);
+      allow list: if isSignedIn()
+        && (resource.data.requester_id == request.auth.uid || resource.data.target_id == request.auth.uid);
+      allow create: if isVerifiedEmail()
+        && isValidId(requestId)
+        && isValidFollowRequest(incoming(), requestId)
+        && requestId == incoming().requester_id + '__' + incoming().target_id
+        && incoming().requester_id == request.auth.uid
+        && incoming().created_at == request.time;
+      allow update: if false;
+      allow delete: if isVerifiedEmail()
+        && isValidId(requestId)
+        && (existing().requester_id == request.auth.uid || existing().target_id == request.auth.uid);
+    }
+
+    match /blocks/{blockId} {
+      allow get: if isSignedIn() && isValidId(blockId) && existing().blocker_id == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.blocker_id == request.auth.uid;
+      allow create: if isVerifiedEmail()
+        && isValidId(blockId)
+        && isValidBlock(incoming(), blockId)
+        && blockId == incoming().blocker_id + '__' + incoming().blocked_id
+        && incoming().blocker_id == request.auth.uid
+        && incoming().created_at == request.time;
+      allow update: if false;
+      allow delete: if isVerifiedEmail()
+        && isValidId(blockId)
+        && existing().blocker_id == request.auth.uid;
+    }
+
+    match /conversations/{convId} {
+      allow get: if isSignedIn() && isValidId(convId) && request.auth.uid in existing().member_ids;
+      allow list: if isSignedIn() && request.auth.uid in resource.data.member_ids;
+      allow create: if isVerifiedEmail()
+        && isValidId(convId)
+        && isValidConversation(incoming(), convId)
+        && request.auth.uid in incoming().member_ids
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isValidId(convId)
+        && isValidConversation(incoming(), convId)
+        && request.auth.uid in existing().member_ids
+        && incoming().id == existing().id
+        && incoming().member_ids == existing().member_ids
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'last_message_content', 'last_message_sender', 'last_message_time', 'updated_at'
+        ]);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidShortId(messageId) && request.auth.uid in existing().member_ids;
+        allow list: if isSignedIn() && request.auth.uid in resource.data.member_ids;
+        allow create: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(messageId)
+          && isValidMessage(incoming(), convId, messageId)
+          && incoming().sender_id == request.auth.uid
+          && incoming().created_at == request.time
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids
+          && incoming().member_ids == get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids;
+        allow update: if false;
+        allow delete: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(messageId)
+          && existing().sender_id == request.auth.uid;
+      }
+
+      match /reads/{readerId} {
+        allow get: if isSignedIn()
+          && isValidId(convId)
+          && isValidShortId(readerId)
+          && (
+            isOwner(readerId)
+            || request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids
+          );
+        allow list: if isSignedIn() && resource.data.user_id == request.auth.uid;
+        allow create: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(readerId)
+          && isOwner(readerId)
+          && isValidConvRead(incoming(), readerId)
+          && incoming().last_read_at == request.time
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids;
+        allow update: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(readerId)
+          && isOwner(readerId)
+          && isValidConvRead(incoming(), readerId)
+          && incoming().user_id == existing().user_id
+          && incoming().last_read_at == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['last_read_at'])
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids;
+        allow delete: if false;
+      }
+
+      match /message_reactions/{reactionId} {
+        allow get: if isSignedIn() && isValidId(reactionId) && request.auth.uid in existing().member_ids;
+        allow list: if isSignedIn() && request.auth.uid in resource.data.member_ids;
+        allow create: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidId(reactionId)
+          && isValidMessageReaction(incoming(), reactionId)
+          && incoming().user_id == request.auth.uid
+          && reactionId == incoming().message_id + '__' + request.auth.uid
+          && incoming().updated_at == request.time
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids
+          && incoming().member_ids == get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids;
+        allow update: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidId(reactionId)
+          && isValidMessageReaction(incoming(), reactionId)
+          && existing().user_id == request.auth.uid
+          && incoming().id == existing().id
+          && incoming().message_id == existing().message_id
+          && incoming().user_id == existing().user_id
+          && incoming().member_ids == existing().member_ids
+          && incoming().updated_at == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['emoji', 'updated_at']);
+        allow delete: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidId(reactionId)
+          && existing().user_id == request.auth.uid;
+      }
+
+      match /typing/{userId} {
+        allow get: if isSignedIn()
+          && isValidId(convId)
+          && isValidShortId(userId)
+          && (
+            isOwner(userId)
+            || request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids
+          );
+        allow list: if false;
+        allow create: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(userId)
+          && isOwner(userId)
+          && isValidConvTyping(incoming(), userId)
+          && incoming().updated_at == request.time
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(convId)).data.member_ids;
+        allow update: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(userId)
+          && isOwner(userId)
+          && isValidConvTyping(incoming(), userId)
+          && incoming().user_id == existing().user_id
+          && incoming().updated_at == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['is_typing', 'updated_at']);
+        allow delete: if isVerifiedEmail()
+          && isValidId(convId)
+          && isValidShortId(userId)
+          && isOwner(userId);
+      }
+    }
+
+    match /notifications/{notifId} {
+      allow get: if isSignedIn() && isValidShortId(notifId) && existing().user_id == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(notifId)
+        && isValidNotification(incoming(), notifId)
+        && incoming().actor_id == request.auth.uid
+        && incoming().read == false
+        && incoming().created_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isValidShortId(notifId)
+        && isValidNotification(incoming(), notifId)
+        && existing().user_id == request.auth.uid
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().actor_id == existing().actor_id
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isVerifiedEmail()
+        && isValidShortId(notifId)
+        && existing().user_id == request.auth.uid;
+    }
+
+    match /reports/{reportId} {
+      allow get: if isSignedIn() && isValidShortId(reportId) && existing().reporter_id == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.reporter_id == request.auth.uid;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(reportId)
+        && isValidReport(incoming(), reportId)
+        && incoming().reporter_id == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().created_at == request.time;
+      allow update, delete: if false;
+    }
+
+    match /presence/{userId} {
+      allow get: if isValidShortId(userId);
+      allow list: if false;
+      allow create: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidPresence(incoming(), userId)
+        && incoming().last_seen_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidPresence(incoming(), userId)
+        && incoming().user_id == existing().user_id
+        && incoming().last_seen_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['online', 'last_seen_at']);
+      allow delete: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId);
+    }
+
+    match /sync_points/{userId} {
+      allow get: if isValidShortId(userId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidSyncPoints(incoming(), userId)
+        && incoming().is_verified == get(/databases/$(database)/documents/users/$(userId)).data.is_verified
+        && incoming().points >= 0
+        && incoming().points <= 500
+        && incoming().interactions_count >= 0
+        && incoming().interactions_count <= 5
+        && incoming().updated_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidSyncPoints(incoming(), userId)
+        && incoming().user_id == existing().user_id
+        && incoming().is_verified == get(/databases/$(database)/documents/users/$(userId)).data.is_verified
+        && incoming().points >= existing().points
+        && incoming().points <= existing().points + 500
+        && incoming().interactions_count >= existing().interactions_count
+        && incoming().interactions_count <= existing().interactions_count + 5
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'display_name', 'avatar_url', 'points',
+          'daily_unlocked_day', 'streak_days', 'interactions_count', 'updated_at'
+        ]);
+      allow delete: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId);
+    }
+
+    match /notes/{userId} {
+      allow get: if isSignedIn() && isValidShortId(userId);
+      allow list: if isSignedIn();
+      allow create: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidNote(incoming(), userId)
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId)
+        && isValidNote(incoming(), userId)
+        && incoming().user_id == existing().user_id
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'display_name', 'avatar_url', 'is_verified',
+          'text', 'expires_at', 'updated_at'
+        ]);
+      allow delete: if isVerifiedEmail()
+        && isOwner(userId)
+        && isValidShortId(userId);
+    }
+
+    match /close_friends_stories/{storyId} {
+      allow get: if isSignedIn()
+        && isValidShortId(storyId)
+        && request.auth.uid in existing().viewer_ids;
+      allow list: if isSignedIn()
+        && request.auth.uid in resource.data.viewer_ids;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(storyId)
+        && isValidCloseFriendsStory(incoming(), storyId)
+        && incoming().user_id == request.auth.uid
+        && request.auth.uid in incoming().viewer_ids
+        && incoming().is_verified == false
+        && incoming().created_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isValidShortId(storyId)
+        && isValidCloseFriendsStory(incoming(), storyId)
+        && existing().user_id == request.auth.uid
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().is_verified == existing().is_verified
+        && incoming().image_url == existing().image_url
+        && incoming().caption == existing().caption
+        && incoming().expires_at == existing().expires_at
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'display_name', 'avatar_url']);
+      allow delete: if isVerifiedEmail()
+        && isValidShortId(storyId)
+        && existing().user_id == request.auth.uid;
+
+      match /views/{viewerId} {
+        allow get: if isSignedIn() && isValidShortId(viewerId) && isOwner(viewerId);
+        allow list: if isSignedIn()
+          && (
+            resource.data.user_id == request.auth.uid
+            || get(/databases/$(database)/documents/close_friends_stories/$(storyId)).data.user_id == request.auth.uid
+          );
+        allow create: if isVerifiedEmail()
+          && isValidShortId(storyId)
+          && isValidShortId(viewerId)
+          && isOwner(viewerId)
+          && isValidStoryView(incoming(), storyId, viewerId)
+          && incoming().created_at == request.time
+          && request.auth.uid in get(/databases/$(database)/documents/close_friends_stories/$(storyId)).data.viewer_ids;
+        allow update, delete: if false;
+      }
+    }
+
+    match /story_highlights/{highlightId} {
+      allow get: if isValidShortId(highlightId);
+      allow list: if true;
+      allow create: if isVerifiedEmail()
+        && isValidShortId(highlightId)
+        && isValidStoryHighlight(incoming(), highlightId)
+        && incoming().user_id == request.auth.uid
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isVerifiedEmail()
+        && isValidShortId(highlightId)
+        && isValidStoryHighlight(incoming(), highlightId)
+        && existing().user_id == request.auth.uid
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'cover_url', 'updated_at']);
+      allow delete: if isVerifiedEmail()
+        && isValidShortId(highlightId)
+        && existing().user_id == request.auth.uid;
+
+      match /items/{itemId} {
+        allow get: if isValidShortId(itemId);
+        allow list: if true;
+        allow create: if isVerifiedEmail()
+          && isValidShortId(highlightId)
+          && isValidShortId(itemId)
+          && isValidStoryHighlightItem(incoming(), highlightId, itemId)
+          && incoming().user_id == request.auth.uid
+          && incoming().created_at == request.time
+          && get(/databases/$(database)/documents/story_highlights/$(highlightId)).data.user_id == request.auth.uid;
+        allow update: if false;
+        allow delete: if isVerifiedEmail()
+          && isValidShortId(highlightId)
+          && isValidShortId(itemId)
+          && existing().user_id == request.auth.uid;
+      }
+    }
+  }
+}

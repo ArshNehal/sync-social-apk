@@ -1,0 +1,29 @@
+{
+  "appId": "network.sync.app",
+  "appName": "SYNC",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "",
+      "releaseType": "AAB"
+    },
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#09090b",
+      "overlaysWebView": false
+    },
+    "Haptics": {
+      "selection": true
+    }
+  }
+}

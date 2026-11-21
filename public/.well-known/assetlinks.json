@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "network.sync.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7F:0F:52:EA:CB:25:4B:E5:94:4E:0F:35:E2:6E:9A:F6:28:B1:BD:31:07:CF:C0:EB:82:17:F1:C7:B5"
+      ]
+    }
+  }
+]

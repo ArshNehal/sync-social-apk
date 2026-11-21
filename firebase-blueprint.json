@@ -1,0 +1,518 @@
+{
+  "entities": {
+    "PublicUser": {
+      "title": "PublicUser",
+      "description": "Publicly readable user profile without PII",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "username_lower": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "bio": { "type": "string", "minLength": 0, "maxLength": 500 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "banner_url": { "type": "string", "minLength": 0, "maxLength": 450000 },
+        "website": { "type": "string", "minLength": 0, "maxLength": 200 },
+        "location": { "type": "string", "minLength": 0, "maxLength": 100 },
+        "is_verified": { "type": "boolean" },
+        "is_private": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "username", "username_lower", "display_name", "bio", "avatar_url", "is_verified", "is_private", "created_at", "updated_at"]
+    },
+    "PrivateUserInfo": {
+      "title": "PrivateUserInfo",
+      "description": "Isolated PII and account password hash only readable by the owning user",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "has_password": { "type": "boolean" },
+        "password_hash": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "password_salt": { "type": "string", "minLength": 0, "maxLength": 64 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "created_at", "updated_at"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Social feed post with optional compressed images and repost/quote references",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "is_verified": { "type": "boolean" },
+        "content": { "type": "string", "minLength": 0, "maxLength": 2000 },
+        "images": { "type": "array" },
+        "likes_count": { "type": "integer" },
+        "comments_count": { "type": "integer" },
+        "reposts_count": { "type": "integer" },
+        "is_repost": { "type": "boolean" },
+        "repost_of_id": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "repost_of_user": { "type": "string", "minLength": 0, "maxLength": 20 },
+        "repost_of_display_name": { "type": "string", "minLength": 0, "maxLength": 80 },
+        "repost_of_content": { "type": "string", "minLength": 0, "maxLength": 1000 },
+        "repost_of_image": { "type": "string", "minLength": 0, "maxLength": 450000 },
+        "is_pinned": { "type": "boolean" },
+        "pinned_at": { "type": "string", "format": "date-time" },
+        "hide_likes": { "type": "boolean" },
+        "comments_disabled": { "type": "boolean" },
+        "mentions": { "type": "array" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "username", "display_name", "avatar_url", "is_verified", "content", "images", "likes_count", "comments_count", "created_at", "updated_at"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "Post like relation paired atomically with post likes_count",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "post_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "post_id", "created_at"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Comment or threaded reply on a post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "post_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "parent_id": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "content": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "likes_count": { "type": "integer" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "is_verified": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "post_id", "user_id", "content", "likes_count", "username", "display_name", "avatar_url", "is_verified", "created_at"]
+    },
+    "Bookmark": {
+      "title": "Bookmark",
+      "description": "Private saved post bookmark owned by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "post_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "post_id", "created_at"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "24-hour visual story with optional tags",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "is_verified": { "type": "boolean" },
+        "image_url": { "type": "string", "minLength": 1, "maxLength": 450000 },
+        "caption": { "type": "string", "minLength": 0, "maxLength": 120 },
+        "tags": { "type": "array" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "username", "display_name", "avatar_url", "is_verified", "image_url", "caption", "expires_at", "created_at"]
+    },
+    "StoryView": {
+      "title": "StoryView",
+      "description": "Marks a story as viewed by a specific user",
+      "type": "object",
+      "properties": {
+        "story_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["story_id", "user_id", "created_at"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "Directional follower relationship",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "follower_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "following_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "follower_id", "following_id", "created_at"]
+    },
+    "FollowRequest": {
+      "title": "FollowRequest",
+      "description": "Pending follow request for private accounts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "requester_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "target_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "status": { "type": "string", "enum": ["pending"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "requester_id", "target_id", "status", "created_at"]
+    },
+    "Block": {
+      "title": "Block",
+      "description": "User block record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "blocker_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "blocked_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "blocker_id", "blocked_id", "created_at"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Two-party direct message thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "member_ids": { "type": "array" },
+        "last_message_content": { "type": "string", "minLength": 0, "maxLength": 1000 },
+        "last_message_sender": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "last_message_time": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "member_ids", "created_at", "updated_at"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Direct message inside a conversation with optional reply quote or shared post preview",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "conversation_id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "sender_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "member_ids": { "type": "array" },
+        "content": { "type": "string", "minLength": 0, "maxLength": 2000 },
+        "image_url": { "type": "string", "minLength": 0, "maxLength": 450000 },
+        "reply_to_id": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "reply_to_text": { "type": "string", "minLength": 0, "maxLength": 300 },
+        "reply_to_sender": { "type": "string", "minLength": 0, "maxLength": 80 },
+        "shared_post_id": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "shared_post_author": { "type": "string", "minLength": 0, "maxLength": 80 },
+        "shared_post_username": { "type": "string", "minLength": 0, "maxLength": 20 },
+        "shared_post_text": { "type": "string", "minLength": 0, "maxLength": 300 },
+        "shared_post_image": { "type": "string", "minLength": 0, "maxLength": 450000 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "conversation_id", "sender_id", "member_ids", "content", "created_at"]
+    },
+    "ConversationRead": {
+      "title": "ConversationRead",
+      "description": "Per-user last read timestamp for a conversation",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "last_read_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "last_read_at"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Activity alert delivered to a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actor_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actor_username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "actor_display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "actor_avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "actor_verified": { "type": "boolean" },
+        "type": { "type": "string", "enum": ["like", "comment", "reply", "follow", "follow_request", "message", "welcome", "repost", "quote", "story_tag", "mention"] },
+        "target_id": { "type": "string", "minLength": 0, "maxLength": 256 },
+        "read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "actor_id", "actor_username", "actor_display_name", "actor_avatar_url", "actor_verified", "type", "target_id", "read", "created_at"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "User-submitted moderation report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "reporter_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "target_type": { "type": "string", "enum": ["post", "user", "comment"] },
+        "target_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "details": { "type": "string", "minLength": 0, "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["pending"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reporter_id", "target_type", "target_id", "reason", "details", "status", "created_at"]
+    },
+    "Presence": {
+      "title": "Presence",
+      "description": "Real-time user online presence indicator",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "online": { "type": "boolean" },
+        "last_seen_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "online", "last_seen_at"]
+    },
+    "SyncPointLedger": {
+      "title": "SyncPointLedger",
+      "description": "Public Sync Points balance and daily streak ledger for the 30-minute Leaderboard",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "is_verified": { "type": "boolean" },
+        "points": { "type": "integer" },
+        "daily_unlocked_day": { "type": "string", "minLength": 0, "maxLength": 16 },
+        "streak_days": { "type": "integer" },
+        "interactions_count": { "type": "integer" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "username", "display_name", "avatar_url", "is_verified", "points", "daily_unlocked_day", "streak_days", "interactions_count", "updated_at"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "24-hour short status note displayed in Direct Messages",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "is_verified": { "type": "boolean" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "username", "display_name", "avatar_url", "is_verified", "text", "expires_at", "created_at", "updated_at"]
+    },
+    "CloseFriend": {
+      "title": "CloseFriend",
+      "description": "Private Close Friends list entry owned by a user",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "friend_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "friend_id", "created_at"]
+    },
+    "CloseFriendsStory": {
+      "title": "CloseFriendsStory",
+      "description": "24-hour story visible only to author and selected close friends",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 20, "pattern": "^[a-z0-9_.]+$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "avatar_url": { "type": "string", "minLength": 0, "maxLength": 350000 },
+        "is_verified": { "type": "boolean" },
+        "image_url": { "type": "string", "minLength": 1, "maxLength": 450000 },
+        "caption": { "type": "string", "minLength": 0, "maxLength": 120 },
+        "tags": { "type": "array" },
+        "viewer_ids": { "type": "array" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "username", "display_name", "avatar_url", "is_verified", "image_url", "caption", "viewer_ids", "expires_at", "created_at"]
+    },
+    "StoryHighlight": {
+      "title": "StoryHighlight",
+      "description": "Permanent curated story collection displayed on a user profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "cover_url": { "type": "string", "minLength": 1, "maxLength": 450000 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "title", "cover_url", "created_at", "updated_at"]
+    },
+    "StoryHighlightItem": {
+      "title": "StoryHighlightItem",
+      "description": "Saved story frame inside a profile highlight",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "highlight_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "image_url": { "type": "string", "minLength": 1, "maxLength": 450000 },
+        "caption": { "type": "string", "minLength": 0, "maxLength": 120 },
+        "tags": { "type": "array" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "highlight_id", "user_id", "image_url", "caption", "created_at"]
+    },
+    "CommentLike": {
+      "title": "CommentLike",
+      "description": "Comment like relation paired atomically with comment likes_count",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "comment_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "comment_id", "created_at"]
+    },
+    "MessageReaction": {
+      "title": "MessageReaction",
+      "description": "Emoji reaction on a direct message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "message_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "member_ids": { "type": "array" },
+        "emoji": { "type": "string", "minLength": 1, "maxLength": 16 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "message_id", "user_id", "member_ids", "emoji", "updated_at"]
+    },
+    "ConversationTyping": {
+      "title": "ConversationTyping",
+      "description": "Ephemeral typing indicator state for a conversation participant",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "is_typing": { "type": "boolean" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "is_typing", "updated_at"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/PublicUser" },
+      "description": "Public user profiles without PII"
+    },
+    "/users/{userId}/private/info": {
+      "schema": { "$ref": "#/entities/PrivateUserInfo" },
+      "description": "Isolated private user PII (email)"
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/Post" },
+      "description": "Social feed posts"
+    },
+    "/likes/{likeId}": {
+      "schema": { "$ref": "#/entities/Like" },
+      "description": "User likes on posts"
+    },
+    "/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/Comment" },
+      "description": "Comments and replies on posts"
+    },
+    "/bookmarks/{bookmarkId}": {
+      "schema": { "$ref": "#/entities/Bookmark" },
+      "description": "Private saved post bookmarks"
+    },
+    "/stories/{storyId}": {
+      "schema": { "$ref": "#/entities/Story" },
+      "description": "24-hour user stories"
+    },
+    "/stories/{storyId}/views/{viewerId}": {
+      "schema": { "$ref": "#/entities/StoryView" },
+      "description": "Tracks which users viewed a story"
+    },
+    "/follows/{followId}": {
+      "schema": { "$ref": "#/entities/Follow" },
+      "description": "Follower/following graph edges"
+    },
+    "/follow_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/FollowRequest" },
+      "description": "Pending follow requests for private profiles"
+    },
+    "/blocks/{blockId}": {
+      "schema": { "$ref": "#/entities/Block" },
+      "description": "User block records"
+    },
+    "/conversations/{convId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Direct message conversations between two members"
+    },
+    "/conversations/{convId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages inside a direct message conversation"
+    },
+    "/conversations/{convId}/reads/{readerId}": {
+      "schema": { "$ref": "#/entities/ConversationRead" },
+      "description": "Last read state per member in a conversation"
+    },
+    "/notifications/{notifId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User activity notifications"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Moderation reports"
+    },
+    "/presence/{userId}": {
+      "schema": { "$ref": "#/entities/Presence" },
+      "description": "Real-time user online presence status"
+    },
+    "/sync_points/{userId}": {
+      "schema": { "$ref": "#/entities/SyncPointLedger" },
+      "description": "Public Sync Points balance and daily streak ledger for the 30-minute Leaderboard"
+    },
+    "/notes/{userId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "24-hour user status notes in Direct Messages"
+    },
+    "/users/{userId}/close_friends/{friendId}": {
+      "schema": { "$ref": "#/entities/CloseFriend" },
+      "description": "Private Close Friends list entries"
+    },
+    "/close_friends_stories/{storyId}": {
+      "schema": { "$ref": "#/entities/CloseFriendsStory" },
+      "description": "24-hour Close Friends stories"
+    },
+    "/close_friends_stories/{storyId}/views/{viewerId}": {
+      "schema": { "$ref": "#/entities/StoryView" },
+      "description": "Tracks which close friends viewed a story"
+    },
+    "/story_highlights/{highlightId}": {
+      "schema": { "$ref": "#/entities/StoryHighlight" },
+      "description": "Permanent profile story highlights"
+    },
+    "/story_highlights/{highlightId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/StoryHighlightItem" },
+      "description": "Saved story frames inside a highlight"
+    },
+    "/comment_likes/{likeId}": {
+      "schema": { "$ref": "#/entities/CommentLike" },
+      "description": "User likes on comments"
+    },
+    "/conversations/{convId}/message_reactions/{reactionId}": {
+      "schema": { "$ref": "#/entities/MessageReaction" },
+      "description": "Emoji reactions on direct messages"
+    },
+    "/conversations/{convId}/typing/{userId}": {
+      "schema": { "$ref": "#/entities/ConversationTyping" },
+      "description": "Real-time typing indicator per conversation participant"
+    }
+  }
+}
